@@ -12,7 +12,7 @@
 
 **步驟**：
 1. 開啟 `Character.cpp`
-2. 選取 `Monster::Draw()` 函數（約第 180-230 行）
+2. 選取 `Monster::Draw()` 函數
 3. 按 `Ctrl + /` 開啟 Copilot Chat
 4. 輸入 `/explain` 或詢問「這段程式碼在做什麼？」
 
