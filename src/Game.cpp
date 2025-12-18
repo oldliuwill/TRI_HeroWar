@@ -4,10 +4,6 @@
 
 using namespace GameConstants;
 
-// ============================================================================
-// 建構與解構
-// ============================================================================
-
 Game::Game()
     : gameState_(GameState::WeaponSelect)
     , lastUpdateTime_(0)
@@ -20,13 +16,10 @@ Game::Game()
     , frameCount_(0)
     , fpsTimer_(0)
 {
-    // 初始化隨機數種子
     srand((unsigned int)time(nullptr));
     
-    // 初始化按鍵狀態
     ZeroMemory(keyStates_, sizeof(keyStates_));
     
-    // 初始化攝影機
     cameraOffset_ = Vector2D(0, 0);
 }
 
@@ -34,19 +27,12 @@ Game::~Game() {
     DeleteBackBuffer();
 }
 
-// ============================================================================
-// 初始化
-// ============================================================================
-
 bool Game::Initialize(HWND hWnd) {
-    // 建立雙緩衝
     CreateBackBuffer(hWnd);
     
-    // 建立英雄（在地圖中央）
     Vector2D heroPos((float)MAP_WIDTH / 2, (float)MAP_HEIGHT / 2);
     hero_ = std::make_unique<Hero>(heroPos);
     
-    // 建立怪獸
     InitializeMonsters();
     
     lastUpdateTime_ = GetTickCount();
@@ -59,14 +45,12 @@ void Game::InitializeMonsters() {
     monsters_.clear();
     
     for (int i = 0; i < INITIAL_MONSTER_COUNT; i++) {
-        // 隨機位置（避開英雄附近）
         Vector2D pos;
         do {
             pos.x = (float)(rand() % (MAP_WIDTH - 100) + 50);
             pos.y = (float)(rand() % (MAP_HEIGHT - 100) + 50);
         } while (hero_ && pos.DistanceTo(hero_->GetPosition()) < 200);
         
-        // 等級分布：1-5級居多，6-10級較少
         int level;
         int roll = rand() % 100;
         if (roll < 40) level = 1;
@@ -74,15 +58,11 @@ void Game::InitializeMonsters() {
         else if (roll < 80) level = 3;
         else if (roll < 90) level = 4;
         else if (roll < 95) level = 5;
-        else level = 6 + rand() % 4;  // 6-9級稀有怪
+        else level = 6 + rand() % 4;
         
         monsters_.push_back(std::make_unique<Monster>(pos, level));
     }
 }
-
-// ============================================================================
-// 雙緩衝管理
-// ============================================================================
 
 void Game::CreateBackBuffer(HWND hWnd) {
     HDC hdc = GetDC(hWnd);
@@ -106,16 +86,11 @@ void Game::DeleteBackBuffer() {
     }
 }
 
-// ============================================================================
-// 遊戲迴圈
-// ============================================================================
-
 void Game::Update() {
     DWORD currentTime = GetTickCount();
     float deltaTime = (currentTime - lastUpdateTime_) / 1000.0f;
     lastUpdateTime_ = currentTime;
     
-    // FPS 計算
     frameCount_++;
     if (currentTime - fpsTimer_ >= 1000) {
         fps_ = frameCount_;
@@ -123,10 +98,8 @@ void Game::Update() {
         fpsTimer_ = currentTime;
     }
     
-    // 根據遊戲狀態更新
     switch (gameState_) {
         case GameState::WeaponSelect:
-            // 等待玩家選擇武器
             if (IsKeyPressed('1')) {
                 hero_->SetWeapon(WeaponType::Sword);
                 gameState_ = GameState::Playing;
@@ -142,7 +115,6 @@ void Game::Update() {
             
         case GameState::GameOver:
         case GameState::Victory:
-            // 按任意鍵重新開始
             if (IsKeyPressed(VK_SPACE) || IsKeyPressed(VK_RETURN)) {
                 hero_ = std::make_unique<Hero>(
                     Vector2D((float)MAP_WIDTH / 2, (float)MAP_HEIGHT / 2)
@@ -155,7 +127,6 @@ void Game::Update() {
 }
 
 void Game::UpdatePlaying(float deltaTime) {
-    // 處理英雄移動
     if (IsKeyPressed(VK_UP) || IsKeyPressed('W')) {
         hero_->Move(Direction::Up);
     }
@@ -169,24 +140,20 @@ void Game::UpdatePlaying(float deltaTime) {
         hero_->Move(Direction::Right);
     }
     
-    // 處理攻擊（按A鍵）
     if (IsKeyPressed('A')) {
         CheckAttack();
     } else {
         hero_->EndAttack();
     }
     
-    // 更新怪獸
     for (auto& monster : monsters_) {
         if (monster->IsAlive()) {
             monster->Update(deltaTime);
         }
     }
     
-    // 更新攝影機
     UpdateCamera();
     
-    // 檢查遊戲結束條件
     CheckGameOver();
 }
 
@@ -195,7 +162,6 @@ void Game::CheckAttack() {
     
     int damage = hero_->PerformAttack();
     
-    // 尋找攻擊範圍內的怪獸
     for (auto& monster : monsters_) {
         if (!monster->IsAlive()) continue;
         
@@ -203,24 +169,21 @@ void Game::CheckAttack() {
         if (distance <= ATTACK_RANGE) {
             monster->TakeDamage(damage);
             
-            // 如果怪獸被擊殺
             if (!monster->IsAlive()) {
                 hero_->GainExperience(monster->GetExperienceReward());
                 hero_->AddKill();
             }
-            break;  // 一次只攻擊一隻
+            break;
         }
     }
 }
 
 void Game::UpdateCamera() {
-    // 攝影機跟隨英雄
     Vector2D heroPos = hero_->GetPosition();
     
     cameraOffset_.x = heroPos.x - WINDOW_WIDTH / 2.0f;
     cameraOffset_.y = heroPos.y - WINDOW_HEIGHT / 2.0f;
     
-    // 限制攝影機範圍
     if (cameraOffset_.x < 0) cameraOffset_.x = 0;
     if (cameraOffset_.y < 0) cameraOffset_.y = 0;
     if (cameraOffset_.x > MAP_WIDTH - WINDOW_WIDTH) 
@@ -230,13 +193,11 @@ void Game::UpdateCamera() {
 }
 
 void Game::CheckGameOver() {
-    // 檢查英雄是否死亡
     if (!hero_->IsAlive()) {
         gameState_ = GameState::GameOver;
         return;
     }
     
-    // 檢查是否所有怪獸都被消滅
     bool allDead = true;
     for (const auto& monster : monsters_) {
         if (monster->IsAlive()) {
@@ -249,10 +210,6 @@ void Game::CheckGameOver() {
         gameState_ = GameState::Victory;
     }
 }
-
-// ============================================================================
-// 輸入處理
-// ============================================================================
 
 void Game::HandleKeyDown(WPARAM key) {
     if (key < 256) {
@@ -270,20 +227,14 @@ bool Game::IsKeyPressed(int key) const {
     return key < 256 && keyStates_[key];
 }
 
-// ============================================================================
-// 繪製
-// ============================================================================
-
 void Game::Render(HDC hdc) {
     if (!memDC_) return;
     
-    // 清除背景
     RECT rect = { 0, 0, bufferWidth_, bufferHeight_ };
     HBRUSH bgBrush = CreateSolidBrush(RGB(40, 40, 50));
     FillRect(memDC_, &rect, bgBrush);
     DeleteObject(bgBrush);
     
-    // 根據狀態繪製
     switch (gameState_) {
         case GameState::WeaponSelect:
             DrawWeaponSelect(memDC_);
@@ -301,7 +252,6 @@ void Game::Render(HDC hdc) {
             break;
     }
     
-    // 複製到螢幕
     BitBlt(hdc, 0, 0, bufferWidth_, bufferHeight_, memDC_, 0, 0, SRCCOPY);
 }
 
@@ -309,7 +259,6 @@ void Game::DrawWeaponSelect(HDC hdc) {
     SetBkMode(hdc, TRANSPARENT);
     SetTextAlign(hdc, TA_CENTER);
     
-    // 標題
     HFONT titleFont = CreateFont(48, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
                                   DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS,
                                   CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Arial");
@@ -325,7 +274,6 @@ void Game::DrawWeaponSelect(HDC hdc) {
     SelectObject(hdc, subtitleFont);
     TextOut(hdc, WINDOW_WIDTH / 2, 160, L"英 雄 戰 爭", 5);
     
-    // 選擇提示
     HFONT menuFont = CreateFont(28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
                                  DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS,
                                  CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Arial");
@@ -334,7 +282,6 @@ void Game::DrawWeaponSelect(HDC hdc) {
     SetTextColor(hdc, RGB(255, 255, 255));
     TextOut(hdc, WINDOW_WIDTH / 2, 280, L"選擇你的武器", 6);
     
-    // 劍選項
     int optionY = 350;
     SetTextColor(hdc, RGB(192, 192, 192));
     TextOut(hdc, WINDOW_WIDTH / 2, optionY, L"[1] 長劍", 6);
@@ -346,18 +293,15 @@ void Game::DrawWeaponSelect(HDC hdc) {
     SetTextColor(hdc, RGB(150, 150, 150));
     TextOut(hdc, WINDOW_WIDTH / 2, optionY + 35, L"攻擊快速 | 傷害: +15 | 攻速: 0.5秒", 20);
     
-    // 繪製劍的圖示
     HPEN swordPen = CreatePen(PS_SOLID, 3, RGB(192, 192, 192));
     HPEN oldPen = (HPEN)SelectObject(hdc, swordPen);
     MoveToEx(hdc, WINDOW_WIDTH / 2 - 100, optionY + 15, NULL);
     LineTo(hdc, WINDOW_WIDTH / 2 - 60, optionY + 15);
-    // 劍柄
     HPEN hiltPen = CreatePen(PS_SOLID, 2, RGB(139, 69, 19));
     SelectObject(hdc, hiltPen);
     MoveToEx(hdc, WINDOW_WIDTH / 2 - 100, optionY + 10, NULL);
     LineTo(hdc, WINDOW_WIDTH / 2 - 100, optionY + 20);
     
-    // 斧頭選項
     optionY = 450;
     SelectObject(hdc, menuFont);
     SetTextColor(hdc, RGB(139, 69, 19));
@@ -367,13 +311,11 @@ void Game::DrawWeaponSelect(HDC hdc) {
     SetTextColor(hdc, RGB(150, 150, 150));
     TextOut(hdc, WINDOW_WIDTH / 2, optionY + 35, L"傷害強大 | 傷害: +30 | 攻速: 1.0秒", 20);
     
-    // 繪製斧頭圖示
     HPEN axePen = CreatePen(PS_SOLID, 3, RGB(139, 69, 19));
     SelectObject(hdc, axePen);
     MoveToEx(hdc, WINDOW_WIDTH / 2 - 100, optionY + 15, NULL);
     LineTo(hdc, WINDOW_WIDTH / 2 - 65, optionY + 15);
     
-    // 斧刃
     HBRUSH axeBrush = CreateSolidBrush(RGB(100, 100, 100));
     HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, axeBrush);
     POINT axeHead[4] = {
@@ -384,12 +326,10 @@ void Game::DrawWeaponSelect(HDC hdc) {
     };
     Polygon(hdc, axeHead, 4);
     
-    // 操作說明
     SelectObject(hdc, descFont);
     SetTextColor(hdc, RGB(100, 100, 100));
     TextOut(hdc, WINDOW_WIDTH / 2, 580, L"操作說明：方向鍵移動 | A鍵攻擊 | ESC退出", 23);
     
-    // 清理
     SelectObject(hdc, oldPen);
     SelectObject(hdc, oldFont);
     SelectObject(hdc, oldBrush);
@@ -404,10 +344,8 @@ void Game::DrawWeaponSelect(HDC hdc) {
 }
 
 void Game::DrawGame(HDC hdc) {
-    // 繪製背景
     DrawBackground(hdc);
     
-    // 繪製怪獸
     for (const auto& monster : monsters_) {
         if (monster->IsAlive()) {
             monster->Draw(hdc, cameraOffset_);
@@ -415,13 +353,11 @@ void Game::DrawGame(HDC hdc) {
         }
     }
     
-    // 繪製英雄
     if (hero_->IsAlive()) {
         hero_->Draw(hdc, cameraOffset_);
         hero_->DrawStatus(hdc, cameraOffset_);
     }
     
-    // 繪製攻擊範圍（當按住A鍵時）
     if (hero_->IsAttacking()) {
         HPEN rangePen = CreatePen(PS_DOT, 1, RGB(255, 100, 100));
         HPEN oldPen = (HPEN)SelectObject(hdc, rangePen);
@@ -437,15 +373,12 @@ void Game::DrawGame(HDC hdc) {
         DeleteObject(rangePen);
     }
     
-    // 繪製小地圖
     DrawMinimap(hdc);
     
-    // 繪製 HUD
     DrawHUD(hdc);
 }
 
 void Game::DrawBackground(HDC hdc) {
-    // 繪製草地格子
     HBRUSH grass1 = CreateSolidBrush(RGB(50, 120, 50));
     HBRUSH grass2 = CreateSolidBrush(RGB(45, 110, 45));
     
@@ -467,7 +400,6 @@ void Game::DrawBackground(HDC hdc) {
     DeleteObject(grass1);
     DeleteObject(grass2);
     
-    // 繪製地圖邊界
     HPEN borderPen = CreatePen(PS_SOLID, 3, RGB(100, 50, 0));
     HPEN oldPen = (HPEN)SelectObject(hdc, borderPen);
     HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
@@ -486,7 +418,6 @@ void Game::DrawBackground(HDC hdc) {
 }
 
 void Game::DrawMinimap(HDC hdc) {
-    // 小地圖位置和大小
     int mapWidth = 150;
     int mapHeight = 112;
     int mapX = WINDOW_WIDTH - mapWidth - 10;
@@ -494,7 +425,6 @@ void Game::DrawMinimap(HDC hdc) {
     float scaleX = (float)mapWidth / MAP_WIDTH;
     float scaleY = (float)mapHeight / MAP_HEIGHT;
     
-    // 背景
     HBRUSH bgBrush = CreateSolidBrush(RGB(30, 30, 30));
     RECT bgRect = { mapX - 2, mapY - 2, mapX + mapWidth + 2, mapY + mapHeight + 2 };
     FillRect(hdc, &bgRect, bgBrush);
@@ -505,7 +435,6 @@ void Game::DrawMinimap(HDC hdc) {
     FillRect(hdc, &mapRect, mapBrush);
     DeleteObject(mapBrush);
     
-    // 繪製怪獸點
     for (const auto& monster : monsters_) {
         if (!monster->IsAlive()) continue;
         
@@ -518,7 +447,6 @@ void Game::DrawMinimap(HDC hdc) {
         DeleteObject(dotBrush);
     }
     
-    // 繪製英雄點
     int heroX = mapX + (int)(hero_->GetPosition().x * scaleX);
     int heroY = mapY + (int)(hero_->GetPosition().y * scaleY);
     
@@ -526,7 +454,6 @@ void Game::DrawMinimap(HDC hdc) {
     Ellipse(hdc, heroX - 4, heroY - 4, heroX + 4, heroY + 4);
     DeleteObject(heroBrush);
     
-    // 繪製視野範圍
     HPEN viewPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
     HPEN oldPen = (HPEN)SelectObject(hdc, viewPen);
     HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
@@ -551,42 +478,35 @@ void Game::DrawHUD(HDC hdc) {
                                 CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Arial");
     HFONT oldFont = (HFONT)SelectObject(hdc, hudFont);
     
-    // 左上角資訊
     int y = 10;
     const int lineHeight = 22;
     
-    // 等級
     SetTextColor(hdc, RGB(255, 215, 0));
     wchar_t text[64];
     swprintf_s(text, L"Lv. %d", hero_->GetLevel());
     TextOut(hdc, 10, y, text, (int)wcslen(text));
     y += lineHeight;
     
-    // 血量
     SetTextColor(hdc, RGB(100, 255, 100));
     swprintf_s(text, L"HP: %d / %d", hero_->GetCurrentHp(), hero_->GetMaxHp());
     TextOut(hdc, 10, y, text, (int)wcslen(text));
     y += lineHeight;
     
-    // 攻擊力
     SetTextColor(hdc, RGB(255, 150, 100));
     swprintf_s(text, L"ATK: %d + %d", hero_->GetAttack(), hero_->GetWeapon().damage);
     TextOut(hdc, 10, y, text, (int)wcslen(text));
     y += lineHeight;
     
-    // 武器
     SetTextColor(hdc, RGB(200, 200, 200));
     swprintf_s(text, L"武器: %s", hero_->GetWeapon().name.c_str());
     TextOut(hdc, 10, y, text, (int)wcslen(text));
     y += lineHeight;
     
-    // 擊殺數
     SetTextColor(hdc, RGB(255, 100, 100));
     swprintf_s(text, L"擊殺: %d", hero_->GetKills());
     TextOut(hdc, 10, y, text, (int)wcslen(text));
     y += lineHeight;
     
-    // 存活怪獸數
     int aliveMonsters = 0;
     for (const auto& m : monsters_) {
         if (m->IsAlive()) aliveMonsters++;
@@ -596,12 +516,10 @@ void Game::DrawHUD(HDC hdc) {
     TextOut(hdc, 10, y, text, (int)wcslen(text));
     y += lineHeight;
     
-    // FPS
     SetTextColor(hdc, RGB(100, 100, 100));
     swprintf_s(text, L"FPS: %d", fps_);
     TextOut(hdc, 10, y, text, (int)wcslen(text));
     
-    // 操作提示（底部）
     SetTextAlign(hdc, TA_CENTER);
     SetTextColor(hdc, RGB(150, 150, 150));
     HFONT tipFont = CreateFont(14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
@@ -617,10 +535,8 @@ void Game::DrawHUD(HDC hdc) {
 }
 
 void Game::DrawGameOver(HDC hdc) {
-    // 半透明遮罩
     HBRUSH overlayBrush = CreateSolidBrush(RGB(0, 0, 0));
     RECT overlayRect = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
-    // 注意：GDI 無法直接繪製半透明，這裡用不透明遮罩
     
     SetBkMode(hdc, TRANSPARENT);
     SetTextAlign(hdc, TA_CENTER);
